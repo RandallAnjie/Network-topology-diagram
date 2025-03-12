@@ -1,0 +1,161 @@
+{
+    "network": {
+        "public": {
+            "autonomous_systems": [
+                {
+                    "as_number": "阿里云",
+                    "network_type": "domestic",
+                    "devices": [
+                        {
+                            "name": "servercn",
+                            "ip": "-",
+                            "interface": "eth0"
+                        }
+                    ]
+                },
+                {
+                    "as_number": "AS40676 Psynet",
+                    "network_type": "international",
+                    "devices": [
+                        {
+                            "name": "server0",
+                            "ip": "-",
+                            "interface": "eth0"
+                        },
+                        {
+                            "name": "server1",
+                            "ip": "-",
+                            "interface": "eth0"
+                        }
+                    ]
+                },
+                {
+                    "as_number": "AS31898 Oracle",
+                    "network_type": "international",
+                    "devices": [
+                        {
+                            "name": "oracle-dubai-amd-1",
+                            "ip": "-",
+                            "interface": "eth0"
+                        },
+                        {
+                            "name": "oracle-dubai-amd-2",
+                            "ip": "-",
+                            "interface": "eth0"
+                        },
+                        {
+                            "name": "oracle-osaka-amd-1",
+                            "ip": "-",
+                            "interface": "eth0"
+                        },
+                        {
+                            "name": "oracle-osaka-amd-2",
+                            "ip": "-",
+                            "interface": "eth0"
+                        }
+                    ]
+                }
+            ]
+        },
+        "private": {
+            "home_network": {
+                "subnet": "192.168.18.0/24",
+                "gateway": {
+                    "name": "xiaomo_router",
+                    "ip": "192.168.18.1",
+                    "interfaces": [
+                        {
+                            "name": "eth0",
+                            "type": "domestic",
+                            "ip": "-"
+                        },
+                        {
+                            "name": "eth1",
+                            "type": "internal",
+                            "ip": "192.168.18.1"
+                        }
+                    ]
+                },
+                "devices": [
+                    {
+                        "name": "rdch-server-mac",
+                        "ip": "192.168.18.10",
+                        "interface": "eth0",
+                        "diversion": {
+                            "target": "server0",
+                            "target_type": "innerserver",
+                            "traffic_type": "external",
+                            "label": "外网分流",
+                            "internet_type": "international"
+                        }
+                    },
+                    {
+                        "name": "rdch-server-r430",
+                        "ip": "192.168.18.18",
+                        "interface": "eth0"
+                    }
+                ]
+            },
+            "home_server_network": {
+                "subnet": "192.169.19.0/24",
+                "gateway": {
+                    "name": "home_openwrt",
+                    "ip": "192.169.19.1",
+                    "interfaces": [
+                        {
+                            "name": "eth0",
+                            "type": "home_network",
+                            "ip": "192.168.18.20"
+                        },
+                        {
+                            "name": "eth1",
+                            "type": "internal",
+                            "ip": "192.169.19.1"
+                        }
+                    ],
+                    "diversion": {
+                        "target": "server0",
+                        "target_type": "innerserver",
+                        "traffic_type": "external",
+                        "label": "外网分流",
+                        "internet_type": "international"
+                    }
+                },
+                "devices": [
+                    {
+                        "name": "rdch-server-windows",
+                        "ip": "192.169.19.2",
+                        "interface": "eth0"
+                    },
+                    {
+                        "name": "rdch-server-ubuntu",
+                        "ip": "192.169.19.3",
+                        "interface": "eth0",
+                        "diversion": {
+                                "target": [
+                                    "oracle-dubai-amd-1",
+                                    "oracle-dubai-amd-2",
+                                    "oracle-osaka-amd-1",
+                                    "oracle-osaka-amd-2"
+                                ],
+                                "target_type": "innerserver",
+                                "traffic_type": "cdn",
+                                "label": "CDN回源",
+                                "internet_type": "international"
+                            }
+                    },
+                    {
+                        "name": "rdch-server-ubuntu-docker",
+                        "ip": "192.169.19.4",
+                        "interface": "eth0"
+                    },
+                    {
+                        "name": "rdch-server-ubuntu-tester",
+                        "ip": "192.169.19.5",
+                        "interface": "eth0"
+                    }
+                ]
+            }
+        }
+    }
+}

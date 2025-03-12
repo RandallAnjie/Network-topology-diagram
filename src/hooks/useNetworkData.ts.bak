@@ -1,0 +1,882 @@
+import { useEffect, useState } from 'react';
+import { Node, Edge } from '@xyflow/react';
+import networkConfig from '../data/network-config.json';
+
+type NetworkDataResult = {
+  nodes: Node[];
+  edges: Edge[];
+  isLoading: boolean;
+  error: Error | null;
+};
+
+type DiversionConfig = {
+  target: string | string[];
+  target_type: 'innerserver' | 'outerserver';
+  traffic_type: string;
+  internet_type?: 'domestic' | 'international';
+  label?: string;
+};
+
+/**
+ * 递归计算网络及其所有子网的最大嵌套深度
+ * @param networkName 网络名称
+ * @param childNetworksMap 子网映射关系
+ */
+function calculateMaxNetworkDepth(networkName: string, childNetworksMap: {[key: string]: string[]}): number {
+  if (!childNetworksMap[networkName] || childNetworksMap[networkName].length === 0) {
+    return 0; // 没有子网，深度为0
+  }
+  
+  // 计算所有子网的最大深度
+  const childDepths = childNetworksMap[networkName].map(childName => 
+    1 + calculateMaxNetworkDepth(childName, childNetworksMap)
+  );
+  
+  // 返回最大值
+  return Math.max(...childDepths);
+}
+
+/**
+ * 计算节点组大小的函数 - 更精确地适应内容
+ * @param deviceCount 设备数量
+ * @param hasSubnetworks 是否包含子网
+ * @param level 网络嵌套的层级
+ * @param maxSubnetDepth 最大子网嵌套深度
+ * @param isAS 是否为自治系统
+ */
+function calculateGroupSize(
+  deviceCount: number, 
+  hasSubnetworks: boolean = false, 
+  level: number = 0,
+  maxSubnetDepth: number = 0,
+  isAS: boolean = false
+): { width: number, height: number } {
+  // 基础大小，AS比LAN需要更高的基础高度
+  const baseWidth = isAS ? 250 : 200;
+  const baseHeight = isAS ? 250 : 180;
+  
+  // 更精确地计算设备空间
+  const devicesPerRow = Math.max(2, Math.min(4, deviceCount)); // 每行最多4个设备
+  const widthPerDevice = 150; // 每个设备占用的宽度
+  const heightPerDevice = isAS ? 140 : 100; // AS中设备占用更多高度
+  
+  // 计算行数和列数
+  const rows = Math.ceil(deviceCount / devicesPerRow);
+  const cols = Math.min(devicesPerRow, deviceCount);
+  
+  // 计算基本大小，添加一些额外边距
+  let width = Math.max(baseWidth, cols * widthPerDevice + 50);
+  let height = Math.max(baseHeight, rows * heightPerDevice + (isAS ? 100 : 60));
+  
+  // 子网情况，根据子网深度增加大小
+  if (hasSubnetworks) {
+    width = Math.max(width * 1.15, 350);
+    
+    // 根据最大子网深度调整高度，每一层子网增加额外空间
+    const depthFactor = isAS ? 
+      1.3 + (maxSubnetDepth * 0.2) : // AS的子网深度系数更大
+      1.3 + (maxSubnetDepth * 0.25); // LAN的子网深度系数  
+    
+    // 提高最小高度，确保嵌套时有足够空间
+    height = Math.max(
+      height * depthFactor, 
+      (isAS ? 350 : 400) + (maxSubnetDepth * 120)
+    );
+  }
+  
+  // 随层级减小大小，但确保最小值
+  if (level > 0) { // 只对子网应用层级缩放
+    const levelFactor = Math.max(0.85, 1 - level * 0.08);
+    width *= levelFactor;
+    // 高度不随层级缩小太多，确保子网有足够高度
+    height *= Math.max(0.9, 1 - level * 0.05);
+  }
+  
+  return { width, height };
+}
+
+export function useNetworkData(): NetworkDataResult {
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    try {
+      const processedNodes: Node[] = [];
+      const processedEdges: Edge[] = [];
+      
+      const inwallsCloudId = 'cloud-inwalls';
+      const globalCloudId = 'cloud-global';
+      
+      const routerDiversions: Array<{routerId: string, targetName: string, diversion: DiversionConfig}> = [];
+      
+      // 调整云节点大小和位置，将它们放在同一水平线上，国内左侧，国际右侧
+      processedNodes.push({
+        id: inwallsCloudId,
+        type: 'cloudNode',
+        data: { 
+          label: 'Inwalls Internet',
+          type: 'domestic'
+        },
+        position: { x: 200, y: 40 }, // 国内网络放在左侧
+        style: { 
+          width: 300, // 更大的宽度
+          height: 120, // 更大的高度
+        }
+      });
+      
+      processedNodes.push({
+        id: globalCloudId,
+        type: 'cloudNode',
+        data: { 
+          label: 'Global Internet',
+          type: 'international'
+        },
+        position: { x: 600, y: 40 }, // 国际网络放在右侧
+        style: { 
+          width: 300, // 更大的宽度
+          height: 120, // 更大的高度
+        }
+      });
+      
+      // 添加一条明确的紫色虚线，从国际互联网连接到国内互联网
+      processedEdges.push({
+        id: 'global-to-inwalls-connection',
+        source: globalCloudId,
+        target: inwallsCloudId,
+        animated: true,
+        type: 'bezier', // 使用贝塞尔曲线
+        label: '国际连接',
+        labelBgPadding: [8, 4],
+        labelBgBorderRadius: 4,
+        style: { 
+          stroke: '#9C27B0', 
+          strokeWidth: 4, 
+          strokeDasharray: '10,5'
+        },
+        labelStyle: { fill: '#9C27B0', fontWeight: 'bold', fontSize: 14 },
+        labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)' }
+      });
+      
+      const asGroups = networkConfig.network.public.autonomous_systems;
+      
+      const nodeIdMap: Record<string, string> = {};
+      
+      // 更紧凑的AS节点布局
+      let totalAsWidth = 0;
+      const asNodes: Node[] = [];
+      
+      // 先计算所有AS节点信息，以便后续布局
+      asGroups.forEach((as) => {
+        const asSize = calculateGroupSize(as.devices.length, false, 0, 0, true);
+        totalAsWidth += asSize.width + 20; // 加上间距
+        
+        const asNode = {
+          size: asSize,
+          deviceCount: as.devices.length,
+          asInfo: as
+        };
+        
+        asNodes.push(asNode as any);
+      });
+      
+      // 更合理的水平间距计算
+      const horizontalSpacing = Math.min(50, Math.max(20, 800 / asNodes.length));
+      
+      // 使用动态布局计算各AS的位置，整体位置下移为云节点留空间
+      let currentX = 50;
+      asNodes.forEach((asNode: any, asIndex) => {
+        const as = asNode.asInfo;
+        const asSize = asNode.size;
+        const asId = `as-${as.as_number}`;
+        const networkType = as.network_type || (asIndex === 0 ? 'domestic' : 'international');
+        
+        processedNodes.push({
+          id: asId,
+          type: 'group',
+          data: { 
+            label: as.as_number,
+            subnet: '', 
+            type: 'as',
+            network_type: networkType
+          },
+          position: { x: currentX, y: 220 }, // 更下移一点，为云节点腾出空间
+          style: { 
+            width: asSize.width, 
+            height: asSize.height,
+            backgroundColor: networkType === 'domestic' ? 'rgba(173, 216, 230, 0.15)' : 'rgba(230, 173, 230, 0.15)',
+            borderRadius: '12px',
+            padding: '15px'
+          },
+          className: 'as-group'
+        });
+        
+        // 更新下一个AS的起始位置
+        currentX += asSize.width + horizontalSpacing;
+        
+        // 根据网络类型连接到相应的云节点
+        const asCloudId = networkType === 'domestic' ? inwallsCloudId : globalCloudId;
+        
+        // 优化AS内部设备布局
+        const deviceSpacing = Math.min(150, Math.max(100, asSize.width / (as.devices.length + 1)));
+        
+        as.devices.forEach((device, deviceIndex) => {
+          const deviceId = `device-${as.as_number}-${device.name}`;
+          
+          nodeIdMap[device.name] = deviceId;
+          
+          // 均匀分布设备
+          const deviceX = (deviceIndex + 1) * deviceSpacing - 40;
+          
+          processedNodes.push({
+            id: deviceId,
+            type: 'deviceNode',
+            data: { 
+              label: device.name,
+              ip: device.ip,
+              interface: device.interface,
+              diversion: device.diversion,
+              details: device
+            },
+            position: { x: deviceX, y: 100 },
+            parentId: asId,
+            extent: 'parent',
+          });
+          
+          processedEdges.push({
+            id: `edge-${asCloudId}-${deviceId}`,
+            source: asCloudId,
+            sourceHandle: 'bottom', // 从云节点底部出发
+            target: deviceId,
+            targetHandle: 'top',
+            animated: true,
+            style: { stroke: '#4d4d4d', strokeDasharray: '5,5', opacity: 0.5 },
+            label: 'Internet'
+          });
+          
+          if (device.diversion && device.diversion.target_type === 'outerserver') {
+            const targetCloudId = device.diversion.internet_type === 'domestic' ? inwallsCloudId : globalCloudId;
+            
+            if (targetCloudId !== asCloudId) {
+              processedEdges.push({
+                id: `edge-diversion-${targetCloudId}-${deviceId}`,
+                source: targetCloudId,
+                sourceHandle: 'bottom', // 从云节点底部出发
+                target: deviceId,
+                targetHandle: 'top',
+                animated: true,
+                style: { stroke: '#F59E0B', strokeWidth: 2 },
+                label: device.diversion.label || '外部服务器',
+                labelStyle: { fill: '#F59E0B', fontWeight: 'bold', fontSize: 11 },
+                labelBgStyle: { fill: 'rgba(255, 248, 225, 0.8)' },
+                labelBgPadding: [4, 2],
+                labelBgBorderRadius: 4
+              });
+            }
+          }
+        });
+      });
+
+      const privateNetworks = networkConfig.network.private;
+      
+      // 节点映射和关系映射
+      const networkNodes: {[key: string]: Node} = {};
+      const routerIds: Set<string> = new Set();
+      const gatewayIdByNetwork: {[key: string]: string} = {};
+      const networkDeviceCounts: {[key: string]: number} = {};
+      
+      // 子网关系映射：记录哪些网络是哪些网络的子网
+      const parentNetworkMap: {[key: string]: string} = {};
+      const childNetworksMap: {[key: string]: string[]} = {};
+      
+      // 第一次遍历：创建基本的网络节点，记录子网关系
+      for (const [networkName, networkData] of Object.entries(privateNetworks)) {
+        const network = networkData as any;
+        
+        // 记录设备数量
+        const deviceCount = network.devices ? network.devices.length + 1 : 1;
+        networkDeviceCounts[networkName] = deviceCount;
+        
+        // 检查接口，识别子网关系
+        if (network.gateway && network.gateway.interfaces) {
+          for (const intf of network.gateway.interfaces) {
+            // 如果接口类型与某个网络名匹配，则该网络可能是该接口类型网络的子网
+            if (intf.type && Object.keys(privateNetworks).includes(intf.type)) {
+              const parentNetwork = intf.type;
+              
+              // 记录父网络关系
+              parentNetworkMap[networkName] = parentNetwork;
+              
+              // 记录子网关系
+              if (!childNetworksMap[parentNetwork]) {
+                childNetworksMap[parentNetwork] = [];
+              }
+              childNetworksMap[parentNetwork].push(networkName);
+              break;
+            }
+          }
+        }
+      }
+      
+      // 计算网络的层级深度，用于布局和大小计算
+      const getNetworkLevel = (networkName: string): number => {
+        let level = 0;
+        let currentNetwork = networkName;
+        
+        while (parentNetworkMap[currentNetwork]) {
+          level++;
+          currentNetwork = parentNetworkMap[currentNetwork];
+        }
+        
+        return level;
+      };
+      
+      // 计算根网络的总数量（不包括子网）
+      const rootNetworksCount = Object.keys(privateNetworks).filter(name => !parentNetworkMap[name]).length;
+      
+      // 使用更紧凑的布局
+      const networkSpacing = Math.min(300, Math.max(200, 800 / rootNetworksCount));
+      let networkStartX = 50;
+      
+      // 第二次遍历：创建网络节点
+      for (const [networkName, networkData] of Object.entries(privateNetworks)) {
+        // 跳过已经作为子网处理的网络
+        if (parentNetworkMap[networkName]) {
+          continue;
+        }
+        
+        const createNetworkNode = (name: string, data: any, index: number, parentId?: string, level: number = 0) => {
+          const networkId = `network-${name}`;
+          const network = data;
+          
+          // 检查是否有子网
+          const hasSubnetworks = childNetworksMap[name] && childNetworksMap[name].length > 0;
+          
+          // 计算包含子网设备在内的总设备数
+          let totalDeviceCount = networkDeviceCounts[name] || 0;
+          
+          if (hasSubnetworks) {
+            for (const childNetwork of childNetworksMap[name]) {
+              totalDeviceCount += networkDeviceCounts[childNetwork] || 0;
+            }
+          }
+          
+          // 计算子网的最大嵌套深度，用于调整父容器高度
+          const maxSubnetDepth = hasSubnetworks ? calculateMaxNetworkDepth(name, childNetworksMap) : 0;
+          
+          // 更精确地计算网络组大小，考虑子网深度
+          const networkSize = calculateGroupSize(totalDeviceCount, hasSubnetworks, level, maxSubnetDepth, false);
+          
+          // 更合理的位置计算，为云节点和AS留出足够空间
+          const position = parentId 
+            ? { x: 30, y: 150 + level * 80 } // 子网位置，垂直方向更紧凑
+            : { x: networkStartX, y: 560 }; // 根网络位置，往下调整更多，避免与AS重叠
+          
+          const networkNode: Node = {
+            id: networkId,
+            type: 'group',
+            data: { 
+              label: name.replace('_', ' '),
+              subnet: network.subnet,
+              type: 'lan',
+              level: level
+            },
+            position: position,
+            style: { 
+              width: networkSize.width, 
+              height: networkSize.height,
+              backgroundColor: level === 0 
+                ? 'rgba(144, 238, 144, 0.15)'  // 根网络
+                : `rgba(144, 238, 144, ${0.15 + level * 0.05})`, // 子网颜色稍深
+              borderRadius: '12px',
+              padding: '15px'
+            },
+            parentId: parentId,
+            extent: parentId ? 'parent' : undefined,
+            className: 'lan-group'
+          };
+          
+          networkNodes[name] = networkNode;
+          processedNodes.push(networkNode);
+          
+          const gatewayId = `device-${name}-${network.gateway.name}`;
+          gatewayIdByNetwork[name] = gatewayId;
+          
+          if (!(name === 'internal_network' && network.gateway.name === 'testnet_router')) {
+            if (!routerIds.has(gatewayId)) {
+              routerIds.add(gatewayId);
+              processedNodes.push({
+                id: gatewayId,
+                type: 'routerNode',
+                data: { 
+                  label: network.gateway.name,
+                  ip: network.gateway.ip,
+                  interfaces: network.gateway.interfaces,
+                  diversion: network.gateway.diversion,
+                  details: network.gateway,
+                  isGateway: true
+                },
+                position: { x: 20, y: 30 },
+                parentId: networkId,
+                extent: 'parent',
+              });
+              
+              // 处理路由器接口连接
+              if (network.gateway.interfaces && Array.isArray(network.gateway.interfaces)) {
+                network.gateway.interfaces.forEach(intf => {
+                  if (intf.type === 'domestic') {
+                    processedEdges.push({
+                      id: `edge-${inwallsCloudId}-${gatewayId}-domestic`,
+                      source: inwallsCloudId, // 使用左侧的国内云节点
+                      sourceHandle: 'bottom', // 从云节点底部出发
+                      target: gatewayId,
+                      targetHandle: 'top',
+                      animated: true,
+                      style: { stroke: '#FF9800', strokeWidth: 2 },
+                      label: '国内网络连接',
+                      labelStyle: { fill: '#FF9800', fontWeight: 'bold', fontSize: 11 },
+                      labelBgStyle: { fill: 'rgba(255, 248, 225, 0.8)' },
+                      labelBgPadding: [4, 2],
+                      labelBgBorderRadius: 4
+                    });
+                  }
+                  else if (intf.type === 'international') {
+                    processedEdges.push({
+                      id: `edge-${globalCloudId}-${gatewayId}-international`,
+                      source: globalCloudId, // 使用右侧的国际云节点
+                      sourceHandle: 'bottom', // 从云节点底部出发
+                      target: gatewayId,
+                      targetHandle: 'top',
+                      animated: true,
+                      style: { stroke: '#9C27B0', strokeWidth: 2 },
+                      label: '国际网络连接',
+                      labelStyle: { fill: '#9C27B0', fontWeight: 'bold', fontSize: 11 },
+                      labelBgStyle: { fill: 'rgba(240, 225, 255, 0.8)' },
+                      labelBgPadding: [4, 2],
+                      labelBgBorderRadius: 4
+                    });
+                  }
+                });
+              }
+              
+              if (network.gateway.diversion && network.gateway.diversion.target_type === 'innerserver') {
+                const diversion = network.gateway.diversion;
+                // 处理target可能是数组的情况
+                if (Array.isArray(diversion.target)) {
+                  // 如果是CDN回源类型的多目标，只取第一个目标进行处理
+                  const targetDeviceName = diversion.target[0];
+                  routerDiversions.push({
+                    routerId: gatewayId,
+                    targetName: targetDeviceName,
+                    diversion: diversion
+                  });
+                } else {
+                  // 单个目标的情况
+                  const targetDeviceName = diversion.target;
+                  routerDiversions.push({
+                    routerId: gatewayId,
+                    targetName: targetDeviceName,
+                    diversion: diversion
+                  });
+                }
+              }
+            }
+          }
+          
+          // 添加设备 - 更合理的设备布局
+          if (network.devices && Array.isArray(network.devices)) {
+            // 计算每个设备的间距，确保均匀分布
+            const deviceSpacing = Math.min(150, Math.max(120, networkSize.width / (network.devices.length + 1)));
+            
+            network.devices.forEach((device: any, deviceIndex: number) => {
+              if (name === 'test_network' && device.name === 'testnet_router') {
+                return;
+              }
+              
+              const deviceId = `device-${name}-${device.name}`;
+              const isRouter = device.interfaces !== undefined;
+              
+              nodeIdMap[device.name] = deviceId;
+              
+              if (isRouter && routerIds.has(deviceId)) {
+                return;
+              }
+              
+              if (isRouter) {
+                routerIds.add(deviceId);
+              }
+              
+              // 设备位置计算 - 更均匀地分布
+              const deviceX = (deviceIndex + 1) * deviceSpacing - 40;
+              
+              processedNodes.push({
+                id: deviceId,
+                type: isRouter ? 'routerNode' : 'deviceNode',
+                data: { 
+                  label: device.name,
+                  ip: device.ip,
+                  interfaces: device.interfaces,
+                  interface: device.interface,
+                  diversion: device.diversion,
+                  details: device,
+                  isGateway: false
+                },
+                position: { x: deviceX, y: level === 0 ? 120 : 80 }, // 根网络的设备放低一点
+                parentId: networkId,
+                extent: 'parent',
+              });
+              
+              processedEdges.push({
+                id: `edge-${gatewayId}-${deviceId}`,
+                source: gatewayId,
+                target: deviceId,
+                animated: false,
+                style: { stroke: '#b1b1b7' }
+              });
+              
+              if (device.diversion && device.diversion.target_type === 'outerserver') {
+                const cloudEdge = processedEdges.find(edge => 
+                  edge.source === inwallsCloudId && edge.target === 'device-internal_network-internal_router'
+                );
+                
+                if (cloudEdge) {
+                  const diversionEdgeId = `edge-diversion-${deviceId}-${gatewayId}`;
+                  const edgeIndex = processedEdges.findIndex(edge => edge.id === `edge-${gatewayId}-${deviceId}`);
+                  
+                  if (edgeIndex !== -1) {
+                    processedEdges[edgeIndex] = {
+                      ...processedEdges[edgeIndex],
+                      id: diversionEdgeId,
+                      animated: true,
+                      style: { stroke: '#F59E0B', strokeWidth: 2 },
+                      label: device.diversion.label || '外部服务器',
+                      labelStyle: { fill: '#F59E0B', fontWeight: 'bold', fontSize: 11 },
+                      labelBgStyle: { fill: 'rgba(255, 248, 225, 0.8)' },
+                      labelBgPadding: [4, 2],
+                      labelBgBorderRadius: 4
+                    };
+                  }
+                }
+              }
+            });
+          }
+          
+          // 递归处理子网 - 更合理的子网布局
+          if (childNetworksMap[name]) {
+            const childCount = childNetworksMap[name].length;
+            const childSpacing = networkSize.width / (childCount + 1);
+            
+            childNetworksMap[name].forEach((childName, childIndex) => {
+              const childData = privateNetworks[childName];
+              
+              // 水平分布子网，避免重叠
+              const childXPosition = childIndex * childSpacing + 30;
+              
+              createNetworkNode(childName, childData, childIndex, networkId, level + 1);
+              
+              // 调整子网的位置
+              const childNetworkNode = networkNodes[childName];
+              if (childNetworkNode && childCount > 1) {
+                childNetworkNode.position = { 
+                  x: childXPosition, 
+                  y: childNetworkNode.position.y
+                };
+              }
+              
+              // 添加从父网关到子网关的连接
+              const parentGatewayId = gatewayIdByNetwork[name];
+              const childGatewayId = gatewayIdByNetwork[childName];
+              
+              if (parentGatewayId && childGatewayId) {
+                processedEdges.push({
+                  id: `edge-subnet-${parentGatewayId}-${childGatewayId}`,
+                  source: parentGatewayId,
+                  sourceHandle: 'bottom',
+                  target: childGatewayId,
+                  targetHandle: 'top',
+                  animated: true,
+                  style: { stroke: '#4CAF50', strokeWidth: 2 },
+                  label: '子网连接',
+                  labelStyle: { fill: '#4CAF50', fontWeight: 'bold', fontSize: 11 },
+                  labelBgStyle: { fill: 'rgba(232, 245, 233, 0.8)' },
+                  labelBgPadding: [4, 2],
+                  labelBgBorderRadius: 4
+                });
+              }
+            });
+          }
+        };
+        
+        // 处理根网络及其所有子网
+        createNetworkNode(networkName, networkData, 0);
+        
+        // 更新下一个根网络的位置
+        const currentNetworkNode = networkNodes[networkName];
+        if (currentNetworkNode && currentNetworkNode.style) {
+          networkStartX += (currentNetworkNode.style.width as number) + networkSpacing;
+        } else {
+          networkStartX += 350; // 默认间距
+        }
+      }
+      
+      // 处理接口类型连接，除了已经作为子网处理的网络
+      for (const [networkName, networkData] of Object.entries(privateNetworks)) {
+        // 跳过已经作为子网处理的网络
+        if (parentNetworkMap[networkName]) {
+          continue;
+        }
+        
+        const network = networkData as any;
+        const currentGatewayId = gatewayIdByNetwork[networkName];
+        
+        if (network.gateway.interfaces && Array.isArray(network.gateway.interfaces)) {
+          // 处理非子网接口类型
+          network.gateway.interfaces.forEach(intf => {
+            // 跳过导致子网关系的接口类型
+            if (intf.type && Object.keys(privateNetworks).includes(intf.type)) {
+              return;
+            }
+            
+            // 修改：更通用的接口处理方式，查找对应名称的LAN网络
+            if (intf.type && gatewayIdByNetwork[intf.type]) {
+              const sourceNetworkGatewayId = gatewayIdByNetwork[intf.type];
+              
+              // 避免自我连接或已经作为子网处理的连接
+              if (sourceNetworkGatewayId && currentGatewayId && networkName !== intf.type) {
+                processedEdges.push({
+                  id: `edge-${sourceNetworkGatewayId}-${currentGatewayId}-${intf.type}`,
+                  source: sourceNetworkGatewayId,
+                  sourceHandle: 'bottom',
+                  target: currentGatewayId,
+                  targetHandle: 'top',
+                  animated: true,
+                  style: { stroke: '#4CAF50', strokeWidth: 2 },
+                  label: `${intf.type.replace('_', ' ')}连接`,
+                  labelStyle: { fill: '#4CAF50', fontWeight: 'bold', fontSize: 11 },
+                  labelBgStyle: { fill: 'rgba(232, 245, 233, 0.8)' },
+                  labelBgPadding: [4, 2],
+                  labelBgBorderRadius: 4
+                });
+              }
+            }
+          });
+        }
+      }
+      
+      // 特殊处理 test_network 和 internal_network 关系
+      if (networkNodes['test_network'] && networkNodes['internal_network']) {
+        const testNetworkNode = networkNodes['test_network'];
+        const internalNetworkNode = networkNodes['internal_network'];
+        
+        // 调整internal_network大小以适应其子网
+        if (internalNetworkNode.style) {
+          const childSize = testNetworkNode.style?.width || 400;
+          internalNetworkNode.style.width = Math.max(internalNetworkNode.style.width as number, (childSize as number) + 100);
+          internalNetworkNode.style.height = Math.max(internalNetworkNode.style.height as number, 400);
+        }
+        
+        // 更合理的子网位置
+        testNetworkNode.position = { x: 50, y: 220 };
+        testNetworkNode.parentId = internalNetworkNode.id;
+        testNetworkNode.extent = 'parent';
+      }
+      
+      // 连接到云的特殊边
+      const internalRouterNode = processedNodes.find(node => 
+        node.id === 'device-internal_network-internal_router'
+      );
+      
+      if (internalRouterNode) {
+        processedEdges.push({
+          id: 'edge-cloud-internal',
+          source: inwallsCloudId,
+          sourceHandle: 'bottom', // 从云节点底部出发
+          target: internalRouterNode.id,
+          targetHandle: 'top',
+          animated: true,
+          style: { stroke: '#FF9800', strokeWidth: 2 },
+          label: 'Internet Connection'
+        });
+      }
+      
+      // 网络间的内部连接
+      const internalNetworkRouter = processedNodes.find(node => 
+        node.id === 'device-internal_network-internal_router'
+      );
+      
+      const testNetworkRouter = processedNodes.find(node => 
+        node.id === 'device-test_network-testnet_router'
+      );
+      
+      if (internalNetworkRouter && testNetworkRouter) {
+        processedEdges.push({
+          id: 'edge-internal-test',
+          source: internalNetworkRouter.id,
+          target: testNetworkRouter.id,
+          animated: true,
+          style: { stroke: '#9C27B0', strokeWidth: 2 },
+          label: '内网连接'
+        });
+      }
+      
+      // 路由分流连接
+      routerDiversions.forEach(({routerId, targetName, diversion}) => {
+        const targetNode = processedNodes.find(n => {
+          const targetId = nodeIdMap[targetName] || targetName;
+          return n.id === targetId || n.id.endsWith(`-${targetName}`);
+        });
+        
+        if (targetNode) {
+          processedEdges.push({
+            id: `edge-diversion-router-${routerId}-${targetNode.id}`,
+            source: targetNode.id,
+            sourceHandle: 'bottom',
+            target: routerId,
+            targetHandle: 'top',
+            animated: true,
+            style: { stroke: '#9C27B0', strokeWidth: 2, strokeDasharray: '5, 5' },
+            label: diversion.label || '路由分流',
+            labelStyle: { fill: '#9C27B0', fontWeight: 'bold', fontSize: 11 },
+            labelBgStyle: { fill: 'rgba(240, 225, 255, 0.8)' },
+            labelBgPadding: [4, 2],
+            labelBgBorderRadius: 4
+          });
+        }
+      });
+
+      // 设备分流连接
+      processedNodes.forEach(node => {
+        if (node.data?.diversion) {
+          const diversion = node.data.diversion as DiversionConfig;
+          
+          if (diversion.target_type === 'innerserver') {
+            // 处理CDN回源类型的多目标情况
+            if (diversion.traffic_type === 'cdn' && Array.isArray(diversion.target)) {
+              // 为每个目标创建连接
+              diversion.target.forEach((targetName, index) => {
+                const targetNode = processedNodes.find(n => {
+                  const targetId = nodeIdMap[targetName] || targetName;
+                  return n.id === targetId || n.id.endsWith(`-${targetName}`);
+                });
+                
+                if (targetNode) {
+                  processedEdges.push({
+                    id: `edge-diversion-${node.id}-${targetNode.id}-${index}`,
+                    source: node.id,
+                    sourceHandle: 'right',
+                    target: targetNode.id,
+                    targetHandle: 'left',
+                    animated: true,
+                    style: { stroke: '#9C27B0', strokeWidth: 2, strokeDasharray: '5, 5' },
+                    label: `${diversion.label || '回源'} ${index + 1}`,
+                    labelStyle: { fill: '#9C27B0', fontWeight: 'bold', fontSize: 11 },
+                    labelBgStyle: { fill: 'rgba(255, 225, 235, 0.8)' },
+                    labelBgPadding: [4, 2],
+                    labelBgBorderRadius: 4
+                  });
+                }
+              });
+            } else {
+              // 原有的单目标处理逻辑
+              const targetNode = processedNodes.find(n => {
+                const targetId = nodeIdMap[diversion.target as string] || diversion.target;
+                return n.id === targetId || n.id.endsWith(`-${diversion.target}`);
+              });
+              
+              if (targetNode) {
+                processedEdges.push({
+                  id: `edge-diversion-${node.id}-${targetNode.id}`,
+                  source: node.id,
+                  sourceHandle: 'right',
+                  target: targetNode.id,
+                  targetHandle: 'left',
+                  animated: true,
+                  style: { stroke: '#E91E63', strokeWidth: 2, strokeDasharray: '5, 5' },
+                  label: diversion.label || '分流',
+                  labelStyle: { fill: '#E91E63', fontWeight: 'bold', fontSize: 11 },
+                  labelBgStyle: { fill: 'rgba(255, 225, 235, 0.8)' },
+                  labelBgPadding: [4, 2],
+                  labelBgBorderRadius: 4
+                });
+              
+                const targetCloudId = diversion.internet_type === 'domestic' ? inwallsCloudId : globalCloudId;
+              
+                const edgeExists = processedEdges.some(edge => 
+                  edge.source === targetCloudId && edge.target === targetNode.id
+                );
+              
+                if (!edgeExists) {
+                  processedEdges.push({
+                    id: `edge-${targetCloudId}-${targetNode.id}`,
+                    source: targetCloudId,
+                    sourceHandle: 'bottom', // 从云节点底部出发
+                    target: targetNode.id,
+                    targetHandle: 'top',
+                    animated: true,
+                    style: { stroke: '#9C27B0', strokeWidth: 2 },
+                    label: '专线连接',
+                    labelStyle: { fill: '#9C27B0', fontWeight: 'bold', fontSize: 11 },
+                    labelBgStyle: { fill: 'rgba(240, 225, 255, 0.8)' },
+                    labelBgPadding: [4, 2],
+                    labelBgBorderRadius: 4
+                  });
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 特殊连接
+      const device3Node = processedNodes.find(node => node.id === 'device-AS2-device3');
+      const internalServerNode = processedNodes.find(node => node.id === 'device-internal_network-internal_server');
+      
+      if (device3Node && internalServerNode) {
+        processedEdges.push({
+          id: `edge-diversion-${device3Node.id}-${internalServerNode.id}`,
+          source: device3Node.id,
+          sourceHandle: 'bottom',
+          target: internalServerNode.id,
+          targetHandle: 'top',
+          animated: true,
+          style: { stroke: '#9C27B0', strokeWidth: 2 },
+          label: '专线分流',
+          labelStyle: { fill: '#9C27B0', fontWeight: 'bold', fontSize: 11 },
+          labelBgStyle: { fill: 'rgba(240, 225, 255, 0.8)' },
+          labelBgPadding: [4, 2],
+          labelBgBorderRadius: 4
+        });
+      }
+      
+      const testnetRouterNode = processedNodes.find(node => node.id === 'device-test_network-testnet_router');
+      if (testnetRouterNode && device3Node && testnetRouterNode.data?.diversion) {
+        const diversion = testnetRouterNode.data.diversion as DiversionConfig;
+        
+        processedEdges.push({
+          id: `edge-diversion-${testnetRouterNode.id}-${device3Node.id}`,
+          source: device3Node.id,
+          sourceHandle: 'bottom',
+          target: testnetRouterNode.id,
+          targetHandle: 'top',
+          animated: true,
+          style: { stroke: '#9C27B0', strokeWidth: 2, strokeDasharray: '5, 5' },
+          label: diversion.label || '路由分流',
+          labelStyle: { fill: '#9C27B0', fontWeight: 'bold', fontSize: 11 },
+          labelBgStyle: { fill: 'rgba(240, 225, 255, 0.8)' },
+          labelBgPadding: [4, 2],
+          labelBgBorderRadius: 4
+        });
+      }
+
+      setNodes(processedNodes);
+      setEdges(processedEdges);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Error processing network data'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { nodes, edges, isLoading, error };
+}

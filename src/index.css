@@ -1,0 +1,307 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+.react-flow__node {
+  cursor: pointer;
+}
+
+.react-flow__node-group {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Direct border styles for group nodes */
+.as-group {
+  border: 3px dashed #4682B4 !important;
+  border-radius: 12px !important;
+}
+
+.dark .as-group {
+  border: 3px dashed #3b82f6 !important;
+  border-radius: 12px !important;
+}
+
+.lan-group {
+  border: 3px dashed #2E8B57 !important;
+  border-radius: 12px !important;
+}
+
+.dark .lan-group {
+  border: 3px dashed #22c55e !important;
+  border-radius: 12px !important;
+}
+
+/* Handle styles */
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background-color: #6b7280;
+  border: 2px solid white;
+}
+
+.dark .react-flow__handle {
+  background-color: #9ca3af;
+  border: 2px solid #1f2937;
+}
+
+/* Edge styles */
+.react-flow__edge-path {
+  stroke-width: 1.5;
+}
+
+.dark .react-flow__edge-path {
+  stroke: #9ca3af;
+}
+
+/* Cloud connection styles */
+.react-flow__edge[data-testid*="cloud-global"][data-testid*="cloud-inwalls"] .react-flow__edge-path,
+.react-flow__edge[data-testid*="cloud-inwalls"][data-testid*="cloud-global"] .react-flow__edge-path {
+  stroke-width: 3;
+  stroke-dasharray: 10, 5;
+  stroke: #9C27B0;
+}
+
+/* CDN connection styles */
+.react-flow__edge[data-testid*="edge-cdn-final"] {
+  z-index: 9999 !important;
+}
+
+.react-flow__edge[data-testid*="edge-cdn-final"] .react-flow__edge-path {
+  stroke: #FF5722;
+  stroke-width: 6;
+  stroke-dasharray: 8, 4;
+}
+
+/* CDN连接样式 */
+.react-flow__edge[data-testid*="edge-cdn-"] {
+  z-index: 9999 !important;
+}
+
+.react-flow__edge[data-testid*="edge-cdn-"] .react-flow__edge-path {
+  stroke: #FF5722;
+  stroke-width: 6;
+  stroke-dasharray: 8, 4;
+}
+
+/* CDN连接端点样式 */
+.cdn-source-handle {
+  width: 10px !important;
+  height: 10px !important;
+  background-color: #FF5722 !important;
+  border: 2px solid white !important;
+  z-index: 1000 !important;
+}
+
+.cdn-target-handle {
+  width: 10px !important;
+  height: 10px !important;
+  background-color: #FF5722 !important;
+  border: 2px solid white !important;
+  z-index: 1000 !important;
+}
+
+.dark .cdn-source-handle,
+.dark .cdn-target-handle {
+  border: 2px solid #1f2937 !important;
+}
+
+/* 所有CDN边 - 确保在最上层 */
+.react-flow__edge[data-testid*="edge-cdn-"] {
+  z-index: 10000 !important;
+}
+
+.react-flow__edge[data-testid*="edge-cdn-final-direct-"] {
+  z-index: 10001 !important; /* 最高层级 */
+}
+
+.react-flow__edge[data-testid*="edge-cdn-direct-"] {
+  z-index: 10001 !important; /* 最高层级 */
+}
+
+/* CDN连接线动画 */
+@keyframes dash {
+  from {
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* 确保动画效果应用于CDN连接线 */
+.cdn-animated-path .react-flow__edge-path,
+.react-flow__edge-path.cdn-animated-path,
+.react-flow__edge.cdn-animated-path .react-flow__edge-path {
+  animation: dash 1s linear infinite;
+  stroke: #888888;
+  stroke-width: 0.5px;
+  stroke-dasharray: 5, 2;
+  opacity: 0.6;
+}
+
+/* 为了确保动画效果，添加另一种选择器 */
+.react-flow__edge-animated .react-flow__edge-path {
+  animation: dash 1s linear infinite;
+}
+
+/* Minimap and controls */
+.react-flow__minimap {
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.react-flow__controls {
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dark .react-flow__controls {
+  background-color: #1f2937;
+}
+
+.dark .react-flow__controls-button {
+  background-color: #374151;
+  color: #e5e7eb;
+}
+
+.react-flow__controls-button {
+  border-radius: 4px;
+  margin: 2px;
+}
+
+.react-flow__controls button path {
+  fill: #666;
+}
+
+.dark .react-flow__controls button path {
+  fill: #e5e7eb;
+}
+
+.react-flow__attribution {
+  background: transparent;
+  color: #888;
+  font-size: 10px;
+  bottom: 0;
+  right: 0;
+}
+
+.dark .react-flow__attribution {
+  color: #9ca3af;
+}
+
+/* Shadow effects for focus and hover states */
+[data-type="group"][class*="dark:border-blue"] {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.5);
+}
+
+[data-type="group"][class*="dark:border-green"] {
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.5);
+}
+
+.dark [data-type="group"][class*="dark:border-blue"] {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+.dark [data-type="group"][class*="dark:border-green"] {
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.5);
+}
