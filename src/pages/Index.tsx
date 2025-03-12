@@ -8,11 +8,6 @@ const Index = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-8">
           <NetworkTopology />
         </div>
-        <div className="footer">
-            <p className="text-center text-gray-500 dark:text-gray-400 text-sm">
-                © {new Date().getFullYear()} Powered by <a href="https://randallanjie.com" target="_blank" rel="noreferrer">RandallAnjie.com</a>
-            </p>
-        </div>
       </div>
     </div>
   );

@@ -40,3 +40,88 @@
 .read-the-docs {
   color: #888;
 }
+
+.github-link {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.github-link:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.github-link svg {
+  fill: #333;
+  transition: fill 0.3s ease;
+}
+
+.github-link:hover svg {
+  fill: #0366d6;
+}
+
+/* 暗色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .github-link {
+    background-color: rgba(30, 30, 30, 0.8);
+  }
+
+  .github-link svg {
+    fill: #fff;
+  }
+
+  .github-link:hover svg {
+    fill: #58a6ff;
+  }
+}
+
+/* 页脚样式 */
+.footer {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  padding: 12px 0;
+  background-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  z-index: 900;
+}
+
+.footer a {
+  color: #0366d6;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.footer a:hover {
+  color: #0550ae;
+  text-decoration: underline;
+}
+
+/* 页脚暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .footer {
+    background-color: rgba(30, 30, 30, 0.9);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+  }
+
+  .footer a {
+    color: #58a6ff;
+  }
+
+  .footer a:hover {
+    color: #79b8ff;
+  }
+}
