@@ -734,22 +734,38 @@ export function useNetworkData(): NetworkDataResult {
               return;
             }
             
-            // 修改：更通用的接口处理方式，查找对应名称的LAN网络
-            if (intf.type && gatewayIdByNetwork[intf.type]) {
-              const sourceNetworkGatewayId = gatewayIdByNetwork[intf.type];
+            // 处理两种情况：网络类型接口和设备类型接口
+            if (intf.type) {
+              let targetNodeId = null;
               
-              // 避免自我连接或已经作为子网处理的连接
-              if (sourceNetworkGatewayId && currentGatewayId && networkName !== intf.type) {
+              // 1. 检查是否是网络网关
+              if (gatewayIdByNetwork[intf.type]) {
+                targetNodeId = gatewayIdByNetwork[intf.type];
+              } 
+              // 2. 检查是否是设备节点
+              else {
+                // 查找设备节点
+                const deviceNode = processedNodes.find(node => 
+                  node.id.includes(intf.type) || // 匹配设备名称
+                  (node.data?.label === intf.type) // 匹配设备标签
+                );
+                if (deviceNode) {
+                  targetNodeId = deviceNode.id;
+                }
+              }
+              
+              // 如果找到目标节点，创建连接
+              if (targetNodeId && currentGatewayId && networkName !== intf.type) {
                 processedEdges.push({
-                  id: `edge-${sourceNetworkGatewayId}-${currentGatewayId}-${intf.type}`,
-                  source: sourceNetworkGatewayId,
+                  id: `edge-${targetNodeId}-${currentGatewayId}-${intf.type}`,
+                  source: targetNodeId,
                   sourceHandle: 'bottom-source',
                   target: currentGatewayId,
                   targetHandle: 'top',
                   animated: true,
-                  type: 'bezier', // 使用贝塞尔曲线
+                  type: 'bezier',
                   style: { stroke: '#4CAF50', strokeWidth: 2 },
-                  label: `${intf.type.replace('_', ' ')}连接`,
+                  label: `${intf.type.replace('_', ' ')}内部连接`,
                   labelStyle: { fill: '#4CAF50', fontWeight: 'bold', fontSize: 11 },
                   labelBgStyle: { fill: 'rgba(232, 245, 233, 0.8)' },
                   labelBgPadding: [4, 2],

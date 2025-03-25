@@ -132,17 +132,17 @@
                         "ip": "192.169.19.3",
                         "interface": "eth0",
                         "diversion": {
-                                "target": [
-                                    "oracle-dubai-amd-1",
-                                    "oracle-dubai-amd-2",
-                                    "oracle-osaka-amd-1",
-                                    "oracle-osaka-amd-2"
-                                ],
-                                "target_type": "innerserver",
-                                "traffic_type": "cdn",
-                                "label": "CDN回源",
-                                "internet_type": "international"
-                            }
+                            "target": [
+                                "oracle-dubai-amd-1",
+                                "oracle-dubai-amd-2",
+                                "oracle-osaka-amd-1",
+                                "oracle-osaka-amd-2"
+                            ],
+                            "target_type": "innerserver",
+                            "traffic_type": "cdn",
+                            "label": "CDN回源",
+                            "internet_type": "international"
+                        }
                     },
                     {
                         "name": "rdch-server-ubuntu-docker",
@@ -152,6 +152,37 @@
                     {
                         "name": "rdch-server-ubuntu-tester",
                         "ip": "192.169.19.5",
+                        "interface": "eth0"
+                    }
+                ]
+            },
+            "server1_network": {
+                "subnet": "192.169.20.0/24",
+                "gateway": {
+                    "name": "server1_openwrt",
+                    "ip": "192.169.19.1",
+                    "interfaces": [
+                        {
+                            "name": "eth0",
+                            "type": "server1",
+                            "ip": "192.169.20.2"
+                        },
+                        {
+                            "name": "eth1",
+                            "type": "internal",
+                            "ip": "192.169.20.1"
+                        }
+                    ]
+                },
+                "devices": [
+                    {
+                        "name": "server1_windows",
+                        "ip": "192.169.20.3",
+                        "interface": "eth0"
+                    },
+                    {
+                        "name": "server1_ubuntu",
+                        "ip": "192.169.20.4",
                         "interface": "eth0"
                     }
                 ]
