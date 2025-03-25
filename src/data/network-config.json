@@ -160,12 +160,12 @@
                 "subnet": "192.169.20.0/24",
                 "gateway": {
                     "name": "server1_openwrt",
-                    "ip": "192.169.19.1",
+                    "ip": "192.169.20.1",
                     "interfaces": [
                         {
                             "name": "eth0",
                             "type": "server1",
-                            "ip": "192.169.20.2"
+                            "ip": "-"
                         },
                         {
                             "name": "eth1",
